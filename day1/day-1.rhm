@@ -1,0 +1,109 @@
+#lang rhombus
+
+import:
+  lib("racket/base.rkt")
+  lib("racket/file.rkt"):
+    rename #{file->lines} as file_to_lines
+
+
+def test_string:
+  #{"1abc2
+pqr3stu8vwx
+a1b2c3d4e5f
+treb7uchet"}
+
+// given a string, return a list of strings such that appending
+// them all with newlines between each pair would produce the original
+// string
+fun newline_split(str):
+  nls_helper(str,0,[],[])
+
+fun nls_helper(str,idx,linechars,lines):
+  cond
+  | idx == str.length():
+      List.cons(base.string(& linechars.reverse()),lines).reverse()
+  | ~else:
+      cond
+      | str[idx] == #{#\newline}:
+          nls_helper(str,idx+1,[],
+                     List.cons(base.string(& linechars.reverse()),lines))
+      | ~else:
+          nls_helper(str,idx+1,List.cons(str[idx],linechars),lines)
+
+check newline_split("abc\ndef") ~is_now ["abc","def"]
+check newline_split("") ~is_now [""]
+check newline_split("\nabc\ndef\n") ~is_now ["","abc","def",""]
+
+// a set containing the digits
+def digits:
+  for Set (ch : "0123456789"):
+    ch
+
+
+// return the last element of a list
+fun last(l :: List):
+  match l
+  | []: error("no last of an empty list")
+  | [a]: a
+//  | [_,b...]: last(b)
+  | List.cons(a,b): last(b)
+
+check last([3,4,5]) ~is 5
+check last([]) ~raises "no last of an empty list"
+                         
+// return true when called with a digit
+fun is_digit(d :: Char):
+  digits[d]
+
+def zero_code = base.#{char->integer}(#{#\0})
+
+// given a numeric digit, return the corresponding natural number
+fun digit_to_num(d):
+  def code = base.#{char->integer}(d) - zero_code
+  cond
+  | ((0 <= code) && (code <= 9)):
+      code
+  | ~else: error("not a digit: "++to_string(d))
+
+  
+
+check digit_to_num(#{#\3}) ~is 3
+check digit_to_num(#{#\space}) ~raises "not a digit"
+
+fun parse_line(l):
+  def line_digits:
+    for List (ch: l):
+      keep_when is_digit(ch)
+      ch
+  [line_digits.first,last(line_digits)]
+
+fun process_line([a,b]):
+  10*digit_to_num(a) + digit_to_num(b)
+
+for List (l: newline_split(test_string)):
+  process_line(parse_line(l))
+               
+def input_lines = file.file_to_lines("./input")
+
+for values(sum=0):
+  each l: input_lines
+  sum + process_line(parse_line(l))
+
+def substr_to_num(s):
+  match s
+  | "one": 1
+  | "two": 2
+  | ""
+def digits_rx:
+  #{#px"(one|two|three|four|five|six|seven|eight|nine|ten|0|1|2|3|4|5|6|7|8|9)"}
+
+
+check base.#{regexp-match}(digits_rx,"abdone4") ~is_now ["one","one"]
+
+check base.#{regexp-match}(digits_rx,"abdon2e4") ~is_now ["2","2"]
+
+
+
+
+
+
