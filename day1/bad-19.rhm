@@ -98,6 +98,7 @@ for values(sum=0):
   sum + process_line(parse_line(l))
 
 fun substr_to_num(s :: ReadableString.to_string):
+  print("stn: "++tilde_v(s)++"\n")
   match s
   | "one" || "1" : 1
   | "two" || "2" : 2
@@ -128,7 +129,7 @@ check base.#{regexp-match}(digits_rx,"abdon2e4") ~is_now ["2","2"]
 fun first_digit(l):
   match base.#{regexp-match}(digits_rx,l)
   | [_,s]: substr_to_num(s)
-  | other: error("unexpected value:" ++ tilde_v(other))
+  | other: error("unexpected value:" ++ other.to_string())
 
 check first_digit("abontwo3") ~is 2
 
@@ -140,17 +141,9 @@ fun last_digit(l):
 check last_digit("oneight") ~is 8
 
 fun process_line_part_2(l):
-  def fd = first_digit(l)
-  def ld = last_digit(l)
-  10*fd + ld
+  def f = first_digit(l)
+  def l = last_digit(l)
+  10*f + l
 
+process_line_part_2("abc")
 
-check process_line_part_2("oneight") ~is 18
-
-check process_line_part_2("o2neight") ~is 28
-check process_line_part_2("o2neigh9t") ~is 29
-
-
-for values(sum=0):
-  each l: input_lines
-  sum + process_line_part_2(l)

@@ -1,0 +1,13 @@
+#lang rhombus
+
+import:
+  lib("racket/base.rkt")
+
+// this one returns "matches"; so the string-copy thing matches against the literal "abc"
+match base.#{string-copy}("abc")
+| "abc" : "matches"
+| other : "doesnt-match"
+
+// but this one signals an error! So sometimes it doesn't match. 
+match base.#{string-copy}("abc")
+| "abc" : "matches"
