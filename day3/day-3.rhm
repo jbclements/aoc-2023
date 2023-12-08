@@ -1,6 +1,7 @@
 #lang rhombus
 
 import:
+  "../somelibs.rhm" as libs
   lib("racket/base.rkt"):
     rename #{regexp-match} as regexp_match
   lib("racket/file.rkt"):
@@ -11,76 +12,72 @@ fun tilde_v(x):
   base.format("~v",x)
 
 def test_string:
-  #{"Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
-Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
-Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
-Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
-Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green"}
+  #{"467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598.."}
+
+def non_symbols:
+  for List (ch : ".1234567890"):
+    ch
+
+fun member(v,l :: List):
+  for values(accum = #false):
+    each item: l
+    break_when accum == #true
+    accum || (item == v)
+
+check member(3,[4,3,6]) ~is #true
+check member(5,[4,3,5]) ~is #true
+check member(6,[4,3,5]) ~is #false
 
 
-// whoa, filter isn't built-in?
-fun | filter([],_): []
-    | filter(List.cons(fst,rst),pred):
-        if pred(fst)
-        | List.cons(fst,filter(rst,pred))
-        | filter(rst,pred)
-        
+fun is_symbol(ch):
+  !member(ch,non_symbols)
+
+check is_symbol(#{#\3}) ~is #false
+check is_symbol(#{#\@}) ~is #true
 
 
-check filter([1,2,3,4],(fun (x):x>2)) ~is [3,4]
+// given a line, return a list of the positions in which symbols occur
+fun line_symbol_locs(line_num :: Number, l :: String):
+  for List:
+    each:
+      ch: l
+      i: 0..
+    keep_when is_symbol(ch)
+    [line_num,i]
 
-// whoa, andmap neither?
-fun | andmap([],pred): []
-    | andmap(List.cons(fst,rst),pred):
-        pred(fst) && andmap(rst,pred)
-        
+check line_symbol_locs(8,"..4$.*....") ~is [[8,3],[8,5]]
+
+fun symbol_locs(l):
+  for values(accum = []):
+    each:
+      line: l
+      linenum: 0..
+    line_symbol_locs(linenum,line) ++ accum
 
 
-// given a string (or a Racket string-copy), return the reversed string
-fun string_reverse(s :: ReadableString.to_string):
-  base.string(& base.#{string->list}(s).reverse()).to_string()
+symbol_locs(libs.newline_split(test_string))
 
-// given a string, return a list of strings such that appending
-// them all with `char` between each pair would produce the original
-// string
-fun char_split(char):
-  fun do_split(str :: ReadableString.to_string):
-    split_helper(str,0,[],[])
-    
-  fun split_helper(str,idx,linechars,lines):
-    cond
-    | idx == str.length():
-        List.cons(base.string(& linechars.reverse()).to_string(),lines).reverse()
-    | ~else:
-        cond
-        | str[idx] == char:
-            split_helper(str,idx+1,[],
-                         List.cons(base.string(& linechars.reverse()).to_string(),lines))
-        | ~else:
-            split_helper(str,idx+1,List.cons(str[idx],linechars),lines)
 
-  do_split
-  
-def newline_split = char_split(#{#\newline})
-def semicolon_split = char_split(#{#\;})
-def comma_split = char_split(#{#\,})
-
-check newline_split("abc\ndef") ~is_now ["abc","def"]
-check newline_split("") ~is_now [""]
-check newline_split("\nabc\ndef\n") ~is_now ["","abc","def",""]
-
-def line_rx = #{#px"^Game ([[:digit:]]+):(.*)"}
-
+/*
 fun parse_line(s :: ReadableString.to_string):
   match base.regexp_match(line_rx,s)
-  | [_,numstr,restofline]: [numstr.to_number(),List.map(semicolon_split(restofline),
+  | [_,numstr,restofline]: [numstr.to_number(),List.map(libs.semicolon_split(restofline),
                                                         draw_split)]
   | other: error("parse_line","unexpected line: "++ tilde_v(s))
 
 // a parsed draw is a Map("red"||"green"||"blue",Integer)
            
 fun draw_split(draw :: ReadableString.to_string):
-  Map(& comma_split(draw).map(color_parse))
+  Map(& libs.comma_split(draw).map(color_parse))
 
 fun color_parse(s :: String):
   match base.regexp_match(#{#px" *([[:digit:]]+) (red|green|blue)"},s)
@@ -109,7 +106,7 @@ check check_parsed_draw({"red":3,"green":4,"blue":15}) ~is #false
 
 // a game is a list containing a number and a list of parsed_draw's
 fun check_game([_,draws]):
-  andmap(draws,check_parsed_draw)
+  libs.andmap(draws,check_parsed_draw)
 
 
 def input_lines = file.file_to_lines("./input")
@@ -117,7 +114,7 @@ def input_lines = file.file_to_lines("./input")
 parse_line(input_lines.first)
 
 def parsed_lines = List.map(input_lines,parse_line)
-def passing_games = filter(parsed_lines,check_game)
+def passing_games = libs.filter(parsed_lines,check_game)
 
 fun sum(l :: List):
   for values(sum = 0):
@@ -260,4 +257,5 @@ check process_line_part_2("o2neigh9t") ~is 29
 for values(sum=0):
   each l: input_lines
   sum + process_line_part_2(l)
+*/
 */

@@ -1,0 +1,64 @@
+#lang rhombus
+
+import:
+  lib("racket/base.rkt")
+
+export:
+  filter
+  andmap
+  char_split
+  newline_split
+  comma_split
+  semicolon_split
+  
+
+// whoa, filter isn't built-in?
+fun | filter([],_): []
+    | filter(List.cons(fst,rst),pred):
+        if pred(fst)
+        | List.cons(fst,filter(rst,pred))
+        | filter(rst,pred)
+        
+
+
+check filter([1,2,3,4],(fun (x):x>2)) ~is [3,4]
+
+// whoa, andmap neither?
+fun | andmap([],pred): []
+    | andmap(List.cons(fst,rst),pred):
+        pred(fst) && andmap(rst,pred)
+        
+
+
+// given a string (or a Racket string-copy), return the reversed string
+fun string_reverse(s :: ReadableString.to_string):
+  base.string(& base.#{string->list}(s).reverse()).to_string()
+
+// given a string, return a list of strings such that appending
+// them all with `char` between each pair would produce the original
+// string
+fun char_split(char):
+  fun do_split(str :: ReadableString.to_string):
+    split_helper(str,0,[],[])
+    
+  fun split_helper(str,idx,linechars,lines):
+    cond
+    | idx == str.length():
+        List.cons(base.string(& linechars.reverse()).to_string(),lines).reverse()
+    | ~else:
+        cond
+        | str[idx] == char:
+            split_helper(str,idx+1,[],
+                         List.cons(base.string(& linechars.reverse()).to_string(),lines))
+        | ~else:
+            split_helper(str,idx+1,List.cons(str[idx],linechars),lines)
+
+  do_split
+  
+def newline_split = char_split(#{#\newline})
+def semicolon_split = char_split(#{#\;})
+def comma_split = char_split(#{#\,})
+
+check newline_split("abc\ndef") ~is_now ["abc","def"]
+check newline_split("") ~is_now [""]
+check newline_split("\nabc\ndef\n") ~is_now ["","abc","def",""]
