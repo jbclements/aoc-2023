@@ -1,0 +1,176 @@
+#lang rhombus
+
+import:
+  lib("racket/base.rkt"):
+    rename #{regexp-match} as regexp_match
+  lib("racket/file.rkt"):
+    rename #{file->lines} as file_to_lines
+
+
+fun tilde_v(x):
+  base.format("~v",x)
+
+def test_string:
+  #{"Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green"}
+
+// given a string (or a Racket string-copy), return the reversed string
+fun string_reverse(s :: ReadableString.to_string):
+  base.string(& base.#{string->list}(s).reverse()).to_string()
+
+// given a string, return a list of strings such that appending
+// them all with `char` between each pair would produce the original
+// string
+fun char_split(char):
+  fun do_split(str :: ReadableString.to_string):
+    split_helper(str,0,[],[])
+    
+  fun split_helper(str,idx,linechars,lines):
+    cond
+    | idx == str.length():
+        List.cons(base.string(& linechars.reverse()).to_string(),lines).reverse()
+    | ~else:
+        cond
+        | str[idx] == char:
+            split_helper(str,idx+1,[],
+                         List.cons(base.string(& linechars.reverse()).to_string(),lines))
+        | ~else:
+            split_helper(str,idx+1,List.cons(str[idx],linechars),lines)
+
+  do_split
+  
+def newline_split = char_split(#{#\newline})
+def semicolon_split = char_split(#{#\;})
+
+check newline_split("abc\ndef") ~is_now ["abc","def"]
+check newline_split("") ~is_now [""]
+check newline_split("\nabc\ndef\n") ~is_now ["","abc","def",""]
+
+def line_rx = #{#px"^Game ([[:digit:]]+):(.*)"}
+
+fun parse_line(s :: ReadableString.to_string):
+  match base.regexp_match(line_rx,s)
+  | [_,numstr,restofline]: [numstr.to_number(),semicolon_split(restofline)]
+  | other: error("parse_line","unexpected line: "++ tilde_v(s))
+
+def input_lines = file.file_to_lines("./input")
+
+parse_line(input_lines.first)
+
+/*
+// a set containing the digits
+def digits:
+  for Set (ch : "0123456789"):
+    ch
+
+
+// return the last element of a list
+fun last(l :: List):
+  match l
+  | []: error("no last of an empty list")
+  | [a]: a
+//  | [_,b...]: last(b)
+  | List.cons(a,b): last(b)
+
+check last([3,4,5]) ~is 5
+check last([]) ~raises "no last of an empty list"
+                         
+// return true when called with a digit
+fun is_digit(d :: Char):
+  digits[d]
+
+def zero_code = base.#{char->integer}(#{#\0})
+
+// given a numeric digit, return the corresponding natural number
+fun digit_to_num(d):
+  def code = base.#{char->integer}(d) - zero_code
+  cond
+  | ((0 <= code) && (code <= 9)):
+      code
+  | ~else: error("not a digit: "++to_string(d))
+
+  
+
+check digit_to_num(#{#\3}) ~is 3
+check digit_to_num(#{#\space}) ~raises "not a digit"
+
+fun parse_line(l):
+  def line_digits:
+    for List (ch: l):
+      keep_when is_digit(ch)
+      ch
+  [line_digits.first,last(line_digits)]
+
+fun process_line([a,b]):
+  10*digit_to_num(a) + digit_to_num(b)
+
+for List (l: newline_split(test_string)):
+  process_line(parse_line(l))
+               
+
+
+for values(sum=0):
+  each l: input_lines
+  sum + process_line(parse_line(l))
+
+fun substr_to_num(s :: ReadableString.to_string):
+  match s
+  | "one" || "1" : 1
+  | "two" || "2" : 2
+  | "three" || "3" : 3
+  | "four" || "4" : 4
+  | "five" || "5" : 5
+  | "six" || "6" : 6
+  | "seven" || "7" : 7
+  | "eight" || "8" : 8
+  | "nine" || "9" : 9
+  | "zero" || "0" : 0
+  | other: error("substr_to_num","unexpected input: "++tilde_v(s))
+
+
+check substr_to_num("eight") ~is 8
+check substr_to_num("4") ~is 4
+
+def digits_rx:
+  #{#px"(one|two|three|four|five|six|seven|eight|nine|ten|0|1|2|3|4|5|6|7|8|9)"}
+
+def reverse_digits_rx:
+  #{#px"(9|8|7|6|5|4|3|2|1|0|net|enin|thgie|neves|xis|evif|ruof|eerht|owt|eno)"}
+  
+
+check base.#{regexp-match}(digits_rx,"abdone4") ~is_now ["one","one"]
+check base.#{regexp-match}(digits_rx,"abdon2e4") ~is_now ["2","2"]
+
+fun first_digit(l):
+  match base.#{regexp-match}(digits_rx,l)
+  | [_,s]: substr_to_num(s)
+  | other: error("unexpected value:" ++ tilde_v(other))
+
+check first_digit("abontwo3") ~is 2
+
+fun last_digit(l):
+  match base.#{regexp-match}(reverse_digits_rx,string_reverse(l))
+  | [_,s]: substr_to_num(string_reverse(s))
+  | #false: error("last_digit","no match on line "++tilde_v(l))
+
+check last_digit("oneight") ~is 8
+
+fun process_line_part_2(l):
+  def fd = first_digit(l)
+  def ld = last_digit(l)
+  10*fd + ld
+
+
+check process_line_part_2("oneight") ~is 18
+
+check process_line_part_2("o2neight") ~is 28
+check process_line_part_2("o2neigh9t") ~is 29
+
+
+for values(sum=0):
+  each l: input_lines
+  sum + process_line_part_2(l)
+*/
