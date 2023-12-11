@@ -1,0 +1,32 @@
+#lang rhombus/and_meta
+
+export:
+  Or
+
+// halt on the first non-false value
+reducer.macro 'Or':
+  reducer_meta.pack('build_return',
+                    '(accum = #false)',
+                    'build_inc',
+                    #false,
+                    'final',
+                    'build_finish',
+                    '()',
+                    '[new_accum, accum]')
+expr.macro 'build_return [$new_accum, $accum] $e':
+  '$e'
+defn.macro 'build_inc [$new_accum, $accum] $e':
+  'def $new_accum = $accum || $e'
+expr.macro 'final [$new_accum, $accum]':
+  '$new_accum'
+expr.macro 'build_finish [$new_accum, $accum]':
+  '$new_accum'
+
+// make sure it actually does short-cutting:
+for Or:
+  each i: [#false,#false,#false,3,#false,#false,9,#false]
+  match i
+  | 9: error("explode!")
+  | ~else: i
+
+

@@ -1,0 +1,130 @@
+#lang rhombus/and_meta
+
+export:
+  Or
+  Sum
+  FilterList
+
+// halt on the first non-false value
+reducer.macro 'Or':
+  reducer_meta.pack('return',
+                    '(accum = #false)',
+                    'step_defs',
+                    #false,
+                    'maybe_stop',
+                    'step_result',
+                    '()',
+                    '[new_accum, accum]')
+expr.macro 'return $names $e':
+  '$e'
+defn.macro 'step_defs [$new_accum, $accum] $e':
+  'def $new_accum = $accum || $e'
+expr.macro 'maybe_stop [$new_accum, $accum]':
+  '$new_accum'
+expr.macro 'step_result [$new_accum, $accum]':
+  '$new_accum'
+
+// make sure it actually does short-cutting:
+fun go_1():
+  for Or:
+    each i: [#false,#false,#false,3,#false,#false,9,#false]
+    match i
+    | 9: error("explode!")
+    | ~else: i
+
+check go_1() ~is 3
+
+// add up all of the values
+reducer.macro 'Sum':
+  reducer_meta.pack('sum_return',
+                    '(accum = 0)',
+                    'sum_step_defs',
+                    #false,
+                    #false,
+                    'sum_step_result',
+                    '()',
+                    '[new_accum, accum]')
+expr.macro 'sum_return $names $e':
+  '$e'
+defn.macro 'sum_step_defs [$new_accum, $accum] $e':
+  'def $new_accum = $accum + $e'
+expr.macro 'sum_step_result [$new_accum, $accum]':
+  '$new_accum'
+
+// make sure it actually does short-cutting:
+fun go_2():
+  for Sum:
+    each i: [4,5]
+    i
+
+check go_2() ~is 9
+
+// produce a list containing the non-#f values
+reducer.macro 'FilterList':
+  reducer_meta.pack('lf_return',
+                    '(accum = [])',
+                    'lf_step_defs',
+                    #false,
+                    #false,
+                    'lf_step_result',
+                    '()',
+                    '[new_accum, accum]')
+expr.macro 'lf_return [$new_accum, $accum] $e':
+  'List.reverse($e)'
+defn.macro 'lf_step_defs [$new_accum, $accum] $e':
+  'def $new_accum :
+     cond
+     | $e: List.cons($e,$accum)
+     | ~else: $accum'
+expr.macro 'lf_step_result [$new_accum, $accum]':
+  '$new_accum'
+
+// make sure it actually does short-cutting:
+fun go_3():
+  for FilterList:
+    each i: [4,-1,9,8,-14,7]
+    (i>0 && i)
+
+check go_3() ~is [4,9,8,7]
+
+// sum the elements greater than 0, stop when you get over 20
+reducer.macro 'SumPosTo20':
+  reducer_meta.pack('sptt_return',
+                    '(accum = 0)',
+                    'sptt_step_defs',
+                    #false,
+                    'sptt_final',
+                    'sptt_step_result',
+                    '()',
+                    '[new_accum, accum]')
+// return the total, or "bigger than 20" if the sum is > 20
+expr.macro 'sptt_return [$new_accum, $accum] $e':
+  'cond
+   | $e > 20: "bigger than 20"
+   | ~else: $e'
+// define new_accm to be the sum of the accumulator and the new value
+// if the new value is positive
+defn.macro 'sptt_step_defs [$new_accum, $accum] $e':
+  'def $new_accum :
+     cond
+     | $e > 0: $accum + $e
+     | ~else: $accum'
+// stop after this step if the new sum is > 20
+expr.macro 'sptt_final [$new_accum, $accum]':
+  '$new_accum > 20'
+// supply new values for the accumulator variables:oo
+expr.macro 'sptt_step_result [$new_accum, $accum]':
+  '$new_accum'
+
+
+check (for SumPosTo20 (a: [6,-4,3]):
+         a) ~is 9
+
+check (for SumPosTo20 (a: 3..40):
+         a) ~is "bigger than 20"
+
+check (for SumPosTo20 (a: 5..8):
+         a) ~is 18
+
+check (for SumPosTo20 (a: 3..):
+         a) ~is "bigger than 20"
