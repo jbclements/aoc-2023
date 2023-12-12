@@ -1,0 +1,91 @@
+#lang rhombus/and_meta
+
+// Code taken from https://github.com/Gopiandcode/aoc-rhombus/blob/main/utils/aoc_api.rhm
+// used with permission.
+
+// whoa! It worked! (I just grabbed the cookie from the Firefox storage manager.)
+
+import:
+  lib("net/http-client.rkt") as http_client:
+    rename:
+      #{http-sendrecv} as sendrecv
+
+  rhombus/runtime_path open:
+    rename:
+      def as def_runtime_path
+
+  lib("racket/main.rkt") as racket:
+    rename:
+      #{with-input-from-file} as with_input_from_file
+      #{with-output-to-file} as with_output_to_file
+      #{file-exists?} as exists_file
+  lib("racket/string.rkt") as String:
+    rename:
+      #{string-prefix?} as is_string_prefix
+
+export:
+   retrieve_input_for_day
+   submit_result_for_day
+
+def_runtime_path cookie_path : "cookie"
+def_runtime_path inputs_dir: "inputs"
+
+def cookie: racket.with_input_from_file(cookie_path,racket.#{read-line})
+
+fun download_input_for_day(day :: Int):
+  println("making request")
+  def uri: racket.format("/2023/day/~a/input", day)
+  def values(resp, resp_headers, inp):
+    http_client.sendrecv(
+      "adventofcode.com",
+      uri,
+      ~headers: [
+       "Accept: text/html",
+       racket.format("Cookie: session=~a", cookie),
+      ],
+      #{#:ssl?}: #true
+    )
+  racket.#{port->string}(inp)
+
+// racket.#{file-exists?}()
+fun path_to_input_file_for_day(day :: Int):
+  racket.#{build-path}(
+    inputs_dir,
+    racket.format("~a", day)
+  )
+
+// returns the input for the specified day. Downloads it if it isn't
+// already present locally
+fun retrieve_input_for_day(day :: Int):
+  def input_file_path: path_to_input_file_for_day(day)
+  if !racket.exists_file(input_file_path)
+  | def input_for_day: download_input_for_day(day)
+    racket.with_output_to_file(
+      input_file_path,
+      fun (): print(input_for_day)
+    )
+    input_for_day
+  | racket.with_input_from_file(
+      input_file_path,
+      racket.#{port->string}
+    )
+
+// given a day and a result and a level (can be 1 or 2?), submits the
+// result as the answer for the given day.
+fun submit_result_for_day(day :: Int, result, ~level: level :: Int = 1):
+  def values(resp, resp_output, outp):
+     http_client.sendrecv(
+       "adventofcode.com",
+       racket.format("/2023/day/~a/answer", day),
+       ~method: "POST",
+       ~headers: [
+         "Accept: text/html",
+         "Content-Type: application/x-www-form-urlencoded",
+         racket.format("Cookie: session=~a", cookie)
+       ],
+       #{#:ssl?}: #true,
+       ~data: racket.format("level=~a&answer=~a", level, result)
+     )
+  def response: racket.#{port->string}(outp)
+  racket.#{string-contains?}(response, "day-success")
+  

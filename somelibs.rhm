@@ -14,6 +14,8 @@ export:
   split_around
   has_element
   group_by
+  empty
+  last
   
 
 // whoa, filter isn't built-in?
@@ -109,3 +111,27 @@ fun group_by(l :: Sequence,f):
 fun m(x): x mod 10
           
 check group_by([3,23,449,9,33,8],m) ~is {3:{3,23,33},9:{449,9},8:{8}}
+
+// is the sequence empty?
+fun empty(s :: Sequence):
+  for values(empty=#true):
+    each item: s
+    final_when #true
+    #false
+
+check empty([]) ~is #true
+check empty([1]) ~is #false
+check empty("") ~is #true
+check empty("a") ~is #false
+
+fun last(s :: Sequence):
+  def values(last_val,seen_one):
+    for values(l=#false,seen_one=#false):
+      each item: s
+      values(item,#true)
+  cond
+  | seen_one: last_val
+  | ~else: error("last","given empty_sequence")
+
+check last("abc") ~is #{#\c}
+check last([3,4,5]) ~is 5
