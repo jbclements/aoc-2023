@@ -67,10 +67,11 @@ fun is_digit(ch):
 fun is_star(ch :: Char):
   ch == #{#\*}
   
-check is_symbol(#{#\3}) ~is #false
-check is_symbol(#{#\@}) ~is #true
-check is_digit(#{#\4}) ~is #true
-check is_digit(#{#\.}) ~is #false
+block:
+  check is_symbol(#{#\3}) ~is #false
+  check is_symbol(#{#\@}) ~is #true
+  check is_digit(#{#\4}) ~is #true
+  check is_digit(#{#\.}) ~is #false
 
 fun list_to_array(l :: List):
   Array(& l)
