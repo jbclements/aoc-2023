@@ -58,6 +58,8 @@ def non_symbols: "."++digits
 operator (a >>> b):
   (fun (x):b(a(x)))
 
+
+/*
 fun is_symbol(ch):
   !libs.has_element(non_symbols,ch)
 
@@ -76,6 +78,8 @@ block:
 fun list_to_array(l :: List):
   Array(& l)
 
+*/
+
 fun nonempty_string(s :: String): s != ""
 
 // convert a string of space-separated integers to a list of integers
@@ -84,17 +88,80 @@ fun str_to_numlist(s :: ReadableString.to_string):
                                                                   >>> String.to_int)
 
 
-def lines = libs.newline_split(sample_string).map(String.to_string)
+fun triple_matches([dest :: Int, src :: Int, len :: Int],input :: Int):
+  (src <= input) && (input < src + len)
 
-def seeds:
+fun apply_map(aoc_map :: List,input):
+  match libs.findf(aoc_map.rest,fun (triple):triple_matches(triple,input))
+  | #false: input
+  | [dest,src,len]: dest + (input - src)
+
+block:
+  def test_map = ["foo to bar map:",[3,15,3],[18,2,2]]
+  check apply_map(test_map,8) ~is 8
+  check apply_map(test_map,15) ~is 3 
+  check apply_map(test_map,17) ~is 5 
+  check apply_map(test_map,18) ~is 18
+  check apply_map(test_map,4) ~is 4
+  check apply_map(test_map,3) ~is 19
+
+
+fun apply_map_chain(aoc_map_list :: List.of(List),input :: Int):
+  for values(accum=input):
+    each aoc_map: aoc_map_list
+    apply_map(aoc_map, accum)
+
+fun string_to_lines(input_string :: ReadableString.to_string):
+  libs.newline_split(input_string).map(String.to_string)
+
+fun lines_to_seeds(lines):
   match base.regexp_match(#{#px"^seeds: (.*)$"},lines[0])
   | [_, nums_str]: str_to_numlist(nums_str)
 
-libs.filter(libs.split_around(lines.rest,fun (s): s==""), fun (l): l != [])
+fun lines_to_map_chain(lines):  
 
+  def unparsed_maps:
+    libs.filter(libs.split_around(lines.rest,fun (s): s==""), fun (l): l != [])
+
+  for List (m : unparsed_maps):
+    List.cons(m[0],m.rest.map(str_to_numlist))
+
+
+
+fun find_best_seed(aoc_map_chain, seeds):
+  fun run(seed): apply_map_chain(aoc_map_chain,seed)
+  def values(best_seed, lowest_location):
+    for values(best_seed = seeds.first, lowest_location = run(seeds.first)):
+      each seed: seeds.rest
+      def new_location = run(seed)
+      cond
+      | new_location < lowest_location: values(seed,new_location)
+      | ~else: values(best_seed, lowest_location)
+  [best_seed, lowest_location]
+
+block:
+  def lines = string_to_lines(sample_string)
+  def seeds = lines_to_seeds(lines)
+  def aoc_map_chain = lines_to_map_chain(lines)
+
+
+  check apply_map_chain(libs.take(aoc_map_chain,1),79) ~is 81
+  check apply_map_chain(libs.take(aoc_map_chain,2),79) ~is 81
+  check apply_map_chain(libs.take(aoc_map_chain,3),79) ~is 81
+  check apply_map_chain(libs.take(aoc_map_chain,4),79) ~is 74
+  check apply_map_chain(aoc_map_chain,79) ~is 82
+  check find_best_seed(aoc_map_chain,seeds) ~is [13,35]
 
 //libs.filter(,nonempty_string)
 
+def lines = string_to_lines(aoc_api.retrieve_input_for_day(5))
+def seeds = lines_to_seeds(lines)
+def aoc_map_chain = lines_to_map_chain(lines)
+find_best_seed(aoc_map_chain,seeds)
+
+
+
+#//
 fun string_to_parsed_lines(s :: String):
   def lines = libs.filter(libs.newline_split(s).map(String.to_string),nonempty_string)
   

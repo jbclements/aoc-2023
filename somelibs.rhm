@@ -16,7 +16,48 @@ export:
   group_by
   empty
   last
-  
+  take
+  findf
+  foldl
+
+// given a sequence and a function and a seed, do a left fold. Function libs.takes new
+// element first
+fun foldl(l :: Sequence, f, seed):
+  for values(result=seed):
+    each item: l
+    f(item,result)
+
+check foldl([3,4,5],fun(x,y):2*x+y,1) ~is 25
+
+
+// given a sequence and a function, return the first element of the
+// sequence that satisfies `f`, or #false if none of them does
+fun findf(l :: Sequence, f):
+  def values(found,winner):
+    for values(found=#false,winner=#false):
+      each item : l
+      break_when found
+      values(f(item),item)
+  found && winner
+
+check findf([3,4,5,0],
+            fun (x):
+              match x
+              | 3: #true
+              | 0: error("explode!")
+              | ~else: #false) ~is 3
+
+
+// note.. might wind up producing a shorter list, if you run out!
+fun take(l :: Sequence, n :: Int):
+  for List:
+    each:
+      item: l
+      i: 0..n
+    item
+
+check take([8,2,12,4],2) ~is [8,2]
+
 
 // whoa, filter isn't built-in?
 fun | filter([],_): []
