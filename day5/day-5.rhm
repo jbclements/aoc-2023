@@ -97,7 +97,7 @@ fun apply_map(aoc_map :: List,input):
   | [dest,src,len]: dest + (input - src)
 
 block:
-  def test_map = ["foo to bar map:",[3,15,3],[18,2,2]]
+  def test_map = ["foo to bar map:",[18,2,2],[3,15,3]]
   check apply_map(test_map,8) ~is 8
   check apply_map(test_map,15) ~is 3 
   check apply_map(test_map,17) ~is 5 
@@ -119,13 +119,13 @@ fun lines_to_seeds(lines):
   | [_, nums_str]: str_to_numlist(nums_str)
 
 fun lines_to_map_chain(lines):  
-
   def unparsed_maps:
     libs.filter(libs.split_around(lines.rest,fun (s): s==""), fun (l): l != [])
-
-  for List (m : unparsed_maps):
-    List.cons(m[0],m.rest.map(str_to_numlist))
-
+  def unsorted_chain:
+    for List (m : unparsed_maps):
+      def unsorted_chain6
+      List.cons(m[0],m.rest.map(str_to_numlist))
+  unsorted_chain.sort(fun ([_,s1,_],[_,s2,_]) : s1 < s2)
 
 
 fun find_best_seed(aoc_map_chain, seeds):
