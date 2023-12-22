@@ -1,6 +1,5 @@
 #lang rhombus
 
-
 import:
   "../somelibs.rhm" as libs
   lib("racket/base.rkt"):
@@ -50,7 +49,13 @@ humidity-to-location map:
 60 56 37
 56 93 4
 "}
-  
+
+
+// a submap is [Int,Int,Int] representing a remapping of a chunk of the
+// natural number line. (Specifically chunk [a,b,c] means that the numbers
+                                      // from b to b+c are remapped to the range from a to a+c)
+
+// a map is Listof(submap) which is sorted by the second element
 
 def digits = "1234567890"                              
 def non_symbols: "."++digits
@@ -87,12 +92,67 @@ fun str_to_numlist(s :: ReadableString.to_string):
   base.#{regexp-split}(#{#px" +"},string.#{string-trim}(s)).map(String.to_string
                                                                   >>> String.to_int)
 
-
-fun triple_matches([dest :: Int, src :: Int, len :: Int],input :: Int):
+// does thsi triple apply to this input?
+fun submap_matches([dest :: Int, src :: Int, len :: Int],input :: Int):
   (src <= input) && (input < src + len)
 
+fun max(a,b):
+  cond
+  | a < b: b
+  | ~else: a
+
+fun min(a,b):
+  cond
+  | a < b: a
+  | ~else: b
+
+// given a triple and an interval, return the remapped intervals and the still-unmapped
+// interval (or #false if none remains). Since we consider intervals from low to high,
+// after we find an interval that misses high, we're all done
+fun submap_remap([dest :: Int, src :: Int, len :: Int],[range_lo :: Int, range_hi :: Int]):
+  cond
+  | src >= range_hi:
+      // total miss, it remaps to itself
+      values([[range_lo,range_hi]],#false)
+  | src + len > range_lo:
+      def remap_begin = max(src,range_lo)
+      def remap_end = min(src+len,range_hi)
+      def remapped = [dest + (remap_begin - src),dest + (remap_end - src)]
+      def leftover_bits = cond
+      // a leftover to be mapped across
+      | remap_begin > range_lo: [[range_lo,remap_begin]]
+      | ~else: []
+      def remaining = cond
+      | remap_end < range_hi: [remap_end,range_hi]
+      | ~else: #false
+      values([remapped]++leftover_bits,remaining)
+  | ~else:
+      // total miss low, interval can still be remapped
+      values([],[range_lo,range_hi])
+
+block:
+  def test_map = ["foo to bar map:",[18,2,2],[3,15,3]]
+  check submap_remap([3,15,3],[20,25]) ~is values([],[20,25])
+  check submap_remap([3,15,3],[18,23]) ~is values([],[18,23])
+  check submap_remap([3,15,3],[17,22]) ~is values([[5,6]],[18,22])
+  check submap_remap([3,15,3],[16,21]) ~is values([[4,6]],[18,21])
+  check submap_remap([3,15,3],[15,20]) ~is values([[3,6]],[18,20])
+  check submap_remap([3,15,3],[14,19]) ~is values([[3,6],[14,15]],[18,19])
+  check submap_remap([3,15,3],[13,18]) ~is values([[3,6],[13,15]],#false)
+  check submap_remap([3,15,3],[12,17]) ~is values([[3,5],[12,15]],#false)
+  check submap_remap([3,15,3],[11,16]) ~is values([[3,4],[11,15]],#false)
+  check submap_remap([3,15,3],[10,15]) ~is values([[10,15]],#false)
+  check submap_remap([3,15,3],[9,14]) ~is values([[9,14]],#false)
+  check submap_remap([3,15,3],[18,20]) ~is values([],[18,20])
+  check submap_remap([3,15,3],[17,19]) ~is values([[5,6]],[18,19])
+  check submap_remap([3,15,3],[16,18]) ~is values([[4,6]],#false)
+  check submap_remap([3,15,3],[15,17]) ~is values([[3,5]],#false)
+  check submap_remap([3,15,3],[14,16]) ~is values([[3,4],[14,15]],#false)
+  check submap_remap([3,15,3],[13,15]) ~is values([[13,15]],#false)
+
+// given a single aoc_map and an input, return 
 fun apply_map(aoc_map :: List,input):
-  match libs.findf(aoc_map.rest,fun (triple):triple_matches(triple,input))
+  match libs.findf(aoc_map.rest,fun (triple):submap_matches(triple,input))
   | #false: input
   | [dest,src,len]: dest + (input - src)
 
@@ -105,11 +165,39 @@ block:
   check apply_map(test_map,4) ~is 4
   check apply_map(test_map,3) ~is 19
 
+// given an aoc_map and a range, return the remapped range
+fun map_remap(aoc_map :: List, range):
+  def values(final_remaining,remapped):
+    for values(remaining = range,
+               accum = []):
+      each submap: aoc_map.rest
+      break_when remaining == #false
+      def values (remapped,still_remaining) = submap_remap(submap,remaining)
+      values(still_remaining,remapped++accum)
+  match final_remaining
+  | #false: remapped
+  | leftover: List.cons(leftover,remapped)
 
+block:
+  def test_map = ["foo to bar map:",[18,2,2],[3,15,3]]
+  check map_remap(test_map,[0,20]) ~is [[18,20],[3,6],[4,15],[18,20],[0,2]]
+
+fun map_remaps(aoc_map :: List, ranges):
+  for values(accum = []):
+    each range: ranges
+    map_remap(aoc_map,range)++accum
+
+// given a map_list and an input, return its target
 fun apply_map_chain(aoc_map_list :: List.of(List),input :: Int):
   for values(accum=input):
     each aoc_map: aoc_map_list
     apply_map(aoc_map, accum)
+
+// given a map_list and a list of ranges, return the list of remapped ranges
+fun apply_map_chain_2(aoc_map_list :: List.of(List),inputs :: List.of(List)):
+  for values(accum = inputs):
+    each aoc_map: aoc_map_list
+    map_remaps(aoc_map, accum)
 
 fun string_to_lines(input_string :: ReadableString.to_string):
   libs.newline_split(input_string).map(String.to_string)
@@ -118,14 +206,27 @@ fun lines_to_seeds(lines):
   match base.regexp_match(#{#px"^seeds: (.*)$"},lines[0])
   | [_, nums_str]: str_to_numlist(nums_str)
 
+fun slice_at(l,n):
+  match l
+  | [] : []
+  | _ : cond
+        | l.length() < n : error("lines_to_seeds","list length not divisible by n")
+        | ~else : List.cons(libs.take(l,n),slice_at(libs.drop(l,n),n))
+
+fun lines_to_seed_intervals(lines):
+  match base.regexp_match(#{#px"^seeds: (.*)$"},lines[0])
+  | [_, nums_str]: for List ([a,b]: slice_at(str_to_numlist(nums_str),2)):
+                     [a,a+b]
+
+
+// given a set of lines, return a map_chain
 fun lines_to_map_chain(lines):  
   def unparsed_maps:
     libs.filter(libs.split_around(lines.rest,fun (s): s==""), fun (l): l != [])
-  def unsorted_chain:
-    for List (m : unparsed_maps):
-      def unsorted_chain6
-      List.cons(m[0],m.rest.map(str_to_numlist))
-  unsorted_chain.sort(fun ([_,s1,_],[_,s2,_]) : s1 < s2)
+  for List (m : unparsed_maps):
+    def unsorted_chain = m.rest.map(str_to_numlist)
+    def sorted_chain = unsorted_chain.sort(fun ([_,s1,_],[_,s2,_]) : s1 < s2)
+    List.cons(m[0],sorted_chain)
 
 
 fun find_best_seed(aoc_map_chain, seeds):
@@ -152,6 +253,15 @@ block:
   check apply_map_chain(aoc_map_chain,79) ~is 82
   check find_best_seed(aoc_map_chain,seeds) ~is [13,35]
 
+  def seed_intervals = lines_to_seed_intervals(lines)
+
+  check seed_intervals ~is [[79,79+14],[55,55+13]]
+#//
+  check apply_map_chain(libs.take(aoc_map_chain,1),
+                        seed_intervals
+                        ) ~is 
+  apply_map_chain_2(aoc_map_chain,seed_intervals).sort(fun([a,b],[c,d]): a < c)
+
 //libs.filter(,nonempty_string)
 
 def lines = string_to_lines(aoc_api.retrieve_input_for_day(5))
@@ -159,280 +269,10 @@ def seeds = lines_to_seeds(lines)
 def aoc_map_chain = lines_to_map_chain(lines)
 find_best_seed(aoc_map_chain,seeds)
 
+def seed_intervals = lines_to_seed_intervals(lines)
+apply_map_chain_2(aoc_map_chain,seed_intervals).sort(fun([a,b],[c,d]): a < c)
 
 
-#//
-fun string_to_parsed_lines(s :: String):
-  def lines = libs.filter(libs.newline_split(s).map(String.to_string),nonempty_string)
-  
-  for List (line: lines):
-    match base.regexp_match(#{#px"^Card +([[:digit:]]+): ([^|]+)\\|([^|]+)$"},line)
-    | [_,cardnum_str, winning_nums_str, guessed_nums_str]:
-        [cardnum_str.to_string(), str_to_numlist(winning_nums_str), str_to_numlist(guessed_nums_str)]
-    | other: error("parsed_lines","no match for line: "++tilde_v(line))
-
-#//
-fun go_1(s :: ReadableString.to_string):
-
-  def parsed_lines = string_to_parsed_lines(s)
-   
-  for red.Sum ([n,wins,tries]: parsed_lines):
-    match (libs.filter(tries, wins.has_element).length())
-    | 0: 0
-    | other: 2 ** (other - 1)
-
-#//
-go_1(aoc_api.retrieve_input_for_day(4))
-
-#//
-fun go_2(s :: ReadableString.to_string):
-
-    def parsed_lines = string_to_parsed_lines(s)
-    def a = Array.make(parsed_lines.length(),1)
-
-    for:
-      each:
-        [n,wins,tries]: parsed_lines
-        i : 0..
-      def matches = libs.filter(tries, wins.has_element).length()
-      def this_card_count = a[i]
-      for (j: i+1..i+1+matches):
-        a[j] := a[j] + this_card_count
-    for red.Sum (item: a): item
-
-#//
-check go_2(sample_string) ~is 30
 
 //go_2(aoc_api.retrieve_input_for_day(4))
 
-/*
-// actually let's just do this with a 2d array
-fun string_to_char_array(s :: String):
-  def lines = libs.newline_split(s).map(String.to_string)
-  lines_to_char_array(lines)
-
-fun lines_to_char_array(lines :: List):
-  def lines2 = libs.filter(lines,fun (s :: String): s!="")
-  list_to_array(lines2.map(list_to_array <<< base.#{string->list}))
-  
-
-def test_char_array = string_to_char_array(sample_string)
-
-check string_to_char_array("ab\ncd\nef") ~is_now Array(Array(#{#\a},#{#\b}),
-                                                       Array(#{#\c},#{#\d}),
-                                                       Array(#{#\e},#{#\f}))
-
-// scan a line for sequences of digits
-fun find_nums(l :: String):
-  def zipped:
-    for List:
-      each:
-        ch: l
-        i: 0..
-      [ch,i]
-  def digit_seqs:
-    libs
-      .filter(libs
-                .split_around(zipped,fun ([ch,_]): !is_digit(ch)),(fun (l): l != []))
-  for List (s: digit_seqs):
-    [s[0][1],last(s)[1]+1]
-
-check find_nums("..35..633.") ~is [[2,4],[6,9]]
-
-// given a line number and a begin/end (e.g. [4,6] for chars 4 & 5), return
-// #true if there's a symbol adjacent to a cell in the interval
-fun scan_for_symbols(linenum,[begin,end],cell_array):
-  //println("scanning on line: "++tilde_v(linenum))
-  def linewidth = cell_array[0].length()
-  def height = cell_array.length()
-  fun legal_line(i):
-    i >= 0 && i < height
-  // checks whether j is valid, and the cell contains a symbol
-  fun contains_symbol(i,j):
-    j >= 0 && j < linewidth && is_symbol(cell_array[i][j])
-  // return #true if there is a symbol in the given range
-  fun range_check(row,mincol,maxcol):
-    for red.Or:
-      each j: mincol..maxcol
-      contains_symbol(row,j)
-  fun line_above_check():
-    legal_line(linenum-1) && range_check(linenum-1,begin-1,end+1)
-  fun left_right_check():
-    legal_line(linenum)
-      && (contains_symbol(linenum,begin-1) || contains_symbol(linenum,end))
-  fun line_below_check():
-    legal_line(linenum+1) && range_check(linenum+1,begin-1,end+1)
-  ;; line_above_check
-  (line_above_check()
-     || left_right_check()
-     || line_below_check())
-
-block:
-  def test_array = string_to_char_array("..@..")
-
-  // below right, doesn't quite touch
-  check scan_for_symbols(1,[4,5],test_array) ~is #false
-  // now barely touches
-  check scan_for_symbols(1,[3,5],test_array) ~is #true
-  // move rect left gradually...
-  check scan_for_symbols(1,[2,4],test_array) ~is #true
-  check scan_for_symbols(1,[1,3],test_array) ~is #true
-  check scan_for_symbols(1,[0,2],test_array) ~is #true
-  check scan_for_symbols(1,[-1,1],test_array) ~is #false
-  // middle row
-  check scan_for_symbols(0,[4,6],test_array) ~is #false
-  check scan_for_symbols(0,[3,5],test_array) ~is #true
-  check scan_for_symbols(0,[2,4],test_array) ~is #false
-  check scan_for_symbols(0,[1,3],test_array) ~is #false
-  check scan_for_symbols(0,[0,2],test_array) ~is #true
-  check scan_for_symbols(0,[-1,1],test_array) ~is #false
-  // line_above_check
-  check scan_for_symbols(-1,[4,6],test_array) ~is #false
-  check scan_for_symbols(-1,[3,5],test_array) ~is #true
-  check scan_for_symbols(-1,[2,4],test_array) ~is #true
-  check scan_for_symbols(-1,[1,3],test_array) ~is #true
-  check scan_for_symbols(-1,[0,2],test_array) ~is #true
-  check scan_for_symbols(-1,[-1,1],test_array) ~is #false
-
-
-// given a line number and a begin/end (e.g. [4,6] for chars 4 & 5), return
-// a list of the locations of the adjacent stars
-fun scan_for_stars(linenum,[begin,end],cell_array):
-  def linewidth = cell_array[0].length()
-  def height = cell_array.length()
-  fun legal_line(i):
-    i >= 0 && i < height
-  // checks whether j is valid, and the cell contains a symbol
-  fun star_pos(i,j):
-    j >= 0 && j < linewidth && is_star(cell_array[i][j]) && [i,j]
-  // return #true if there is a symbol in the given range
-  fun range_check(row,mincol,maxcol):
-    for red.FilterList:
-      each j: mincol..maxcol
-      star_pos(row,j)
-  fun line_above_check():
-    cond
-    | legal_line(linenum-1): range_check(linenum-1,begin-1,end+1)
-    | ~else: []
-  fun left_right_check():
-    cond
-    | legal_line(linenum): for red.FilterList:
-                             each [i,j]: [[linenum,begin-1],[linenum,end]]
-                             star_pos(i,j)
-    | ~else: []
-  fun line_below_check():
-    cond
-    | legal_line(linenum+1): range_check(linenum+1,begin-1,end+1)
-    | ~else: []
-  ;; line_above_check
-  (line_above_check()
-     ++ left_right_check()
-     ++ line_below_check())
-
-
-  
-block: */
-// got to comment this line out in a different way:
-//  def test_array = string_to_char_array("*.*/.")
-/*
-  // below right, doesn't quite touch
-  check scan_for_stars(1,[4,6],test_array) ~is []
-  // now barely touches
-  check scan_for_stars(1,[3,5],test_array) ~is [[0,2]]
-  // move rect left gradually...
-  check scan_for_stars(1,[2,4],test_array) ~is [[0,2]]
-  check scan_for_stars(1,[1,3],test_array) ~is [[0,0],[0,2]]
-  check scan_for_stars(1,[0,2],test_array) ~is [[0,0],[0,2]]
-  check scan_for_stars(1,[-1,1],test_array) ~is [[0,0]]
-  // middle row
-  check scan_for_stars(0,[4,6],test_array) ~is []
-  check scan_for_stars(0,[3,5],test_array) ~is [[0,2]]
-  check scan_for_stars(0,[2,4],test_array) ~is []
-  check scan_for_stars(0,[1,3],test_array) ~is [[0,0]]
-  check scan_for_stars(0,[0,2],test_array) ~is [[0,2]]
-  check scan_for_stars(0,[-1,1],test_array) ~is []
-  // line_above_check
-  check scan_for_stars(-1,[4,6],test_array) ~is []
-  check scan_for_stars(-1,[3,5],test_array) ~is [[0,2]]
-  check scan_for_stars(-1,[2,4],test_array) ~is [[0,2]]
-  check scan_for_stars(-1,[1,3],test_array) ~is [[0,0],[0,2]]
-  check scan_for_stars(-1,[0,2],test_array) ~is [[0,0],[0,2]]
-  check scan_for_stars(-1,[-1,1],test_array) ~is [[0,0]]
-
-fun group_by(l,f):
-  for values(table={}):
-    each item: l
-    table ++ {f(item):item}
-
-// given lines and char_array, return a list of 3-tuples, where each
-// one contains the line number and character range of a number and a
-// 2-tuple containing the position of an adjacent star
-fun nums_next_to_stars(lines, char_array):
-  def line_star_pairs:
-    for List:
-      each:
-        line: lines
-        rowidx: 0..
-      fun star_locs(range):
-        scan_for_stars(rowidx, range, char_array)
-      fun range_to_star_pairs(range):
-        for List (pos: star_locs(range)):
-          [rowidx,range,pos]
-      def num_ranges = find_nums(line)
-      List.append(& num_ranges.map(range_to_star_pairs))
-  List.append(& line_star_pairs)
-
-// given the num_star_pairs, group them by the location of the
-// adjacent star, and for sets of length 2, multiply the 2 numbers together
-fun gear_ratios(num_star_pairs,lines, char_array):
-  fun extract_num(row,col_begin,col_end):
-    lines[row].substring(col_begin, col_end).to_int()
-  def set_sets = libs.group_by(num_star_pairs,fun ([_,_,x]): x)
-  for red.Sum (possible_gear: set_sets.values()):
-    match possible_gear.to_list()
-    | [[i1, [j1b, j1e], _], [i2, [j2b, j2e], _]]:
-        extract_num(i1,j1b,j1e) * extract_num(i2,j2b,j2e)
-    | ~else: 0
-
-block:
-  def sample_lines = libs.newline_split(sample_string).map(String.to_string)
-  def char_array = lines_to_char_array(sample_lines)
-  def np = nums_next_to_stars(sample_lines, char_array)
-  check gear_ratios(np,sample_lines, char_array) ~is 467835
-
-
-fun run_puzzle(s :: String):
-  def lines = libs.newline_split(s).map(String.to_string)
-
-  def char_array = string_to_char_array(s)
-
-  def nums_next_to_symbols:
-    for List:
-      each:
-        line: lines
-        rowidx: 0..
-      def num_ranges = find_nums(line)
-      fun check_num(range):
-        scan_for_symbols(rowidx,range,char_array)
-      def nums_next_to_symbols = libs.filter(num_ranges,check_num)
-      for List ([b,e]: nums_next_to_symbols):
-        line.substring(b,e).to_int()
-
-  for red.Sum (line: nums_next_to_symbols):
-    for red.Sum (n: line):
-      n
-
-run_puzzle(sample_string)
-
-def input_string = file.#{file->string}("./input").to_string()
-
-run_puzzle(input_string)
-
-// part 2
-block:
-  def input_lines = libs.newline_split(input_string).map(String.to_string)
-  def input_char_array = lines_to_char_array(input_lines)
-  def np = nums_next_to_stars(input_lines, input_char_array)
-  gear_ratios(np,input_lines, input_char_array)
-
-*/

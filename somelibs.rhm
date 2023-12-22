@@ -17,6 +17,7 @@ export:
   empty
   last
   take
+  drop
   findf
   foldl
 
@@ -57,6 +58,14 @@ fun take(l :: Sequence, n :: Int):
     item
 
 check take([8,2,12,4],2) ~is [8,2]
+
+// note.. might wind up producing a shorter list, if you run out!
+fun drop(l :: Sequence, n :: Int):
+  match n
+  | 0 : l
+  | _ : drop(l.rest,n-1)
+
+check drop([8,2,12,4],2) ~is [12,4]
 
 
 // whoa, filter isn't built-in?
