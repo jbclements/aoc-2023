@@ -20,6 +20,7 @@ export:
   drop
   findf
   foldl
+  slice_at
 
 // given a sequence and a function and a seed, do a left fold. Function libs.takes new
 // element first
@@ -29,6 +30,8 @@ fun foldl(l :: Sequence, f, seed):
     f(item,result)
 
 check foldl([3,4,5],fun(x,y):2*x+y,1) ~is 25
+
+
 
 
 // given a sequence and a function, return the first element of the
@@ -185,3 +188,11 @@ fun last(s :: Sequence):
 
 check last("abc") ~is #{#\c}
 check last([3,4,5]) ~is 5
+
+
+fun slice_at(l,n):
+  match l
+  | [] : []
+  | _ : cond
+        | l.length() < n : error("lines_to_seeds","list length not divisible by n")
+        | ~else : List.cons(take(l,n),slice_at(drop(l,n),n))

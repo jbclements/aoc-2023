@@ -1,0 +1,147 @@
+#lang rhombus
+
+import:
+  "../somelibs.rhm" as libs
+  lib("racket/base.rkt"):
+    rename #{regexp-match} as regexp_match
+  lib("racket/file.rkt"):
+    rename #{file->lines} as file_to_lines
+  "../reducers.rhm" as red
+  lib("racket/string.rkt")
+  "../aoc_api.rhm"
+
+
+fun tilde_v(x):
+  base.format("~v",x)
+
+def sample_string:
+  #{"Time:      7  15   30
+Distance:  9  40  200
+"}
+
+
+// a submap is [Int,Int,Int] representing a remapping of a chunk of the
+// natural number line. (Specifically chunk [a,b,c] means that the numbers
+                                      // from b to b+c are remapped to the range from a to a+c)
+
+// a map is Listof(submap) which is sorted by the second element
+
+def digits = "1234567890"                              
+def non_symbols: "."++digits
+
+operator (a >>> b):
+  (fun (x):b(a(x)))
+
+fun nonempty_string(s :: String): s != ""
+
+// convert a string of space-separated integers to a list of integers
+fun str_to_numlist(s :: ReadableString.to_string):
+  base.#{regexp-split}(#{#px" +"},string.#{string-trim}(s)).map(String.to_string
+                                                                  >>> String.to_int)
+fun max(a,b):
+  cond
+  | a < b: b
+  | ~else: a
+
+fun min(a,b):
+  cond
+  | a < b: a
+  | ~else: b
+
+fun string_to_lines(input_string :: ReadableString.to_string):
+  libs.newline_split(input_string).map(String.to_string)
+
+// append a bunch of integers to get one integer
+fun join_ints(ints :: List.of(Int)):
+  String.to_int(libs.foldl(ints.map(to_string),fun (a,b):base.#{string-append}(b,a),""))
+
+fun parse_lines(lines):
+  def times:
+    match base.regexp_match(#{#px"^Time: (.*)$"},lines[0])
+    | [_, nums_str]: str_to_numlist(nums_str)
+  def distances:
+    match base.regexp_match(#{#px"^Distance: (.*)$"},lines[1])
+    | [_, nums_str]: str_to_numlist(nums_str)
+  for List:
+    each:
+      t: times
+      d: distances
+    [t,d]
+
+fun parse_lines_2(lines):
+  def time:
+    match base.regexp_match(#{#px"^Time: (.*)$"},lines[0])
+    | [_, nums_str]: join_ints(str_to_numlist(nums_str))
+  def distance:
+    match base.regexp_match(#{#px"^Distance: (.*)$"},lines[1])
+    | [_, nums_str]: join_ints(str_to_numlist(nums_str))
+  [[time,distance]]
+    
+
+check parse_lines(string_to_lines(sample_string)) ~is [[7,9],[15,40],[30,200]]
+
+// return the smallest integer strictly larger than the input
+fun int_up(x):
+  def ans:
+    cond
+    | base.#{integer?}(x): x + 1
+    | ~else: base.ceiling(x)
+  base.#{inexact->exact}(ans)
+
+check int_up(3.4) ~is 4
+check int_up(4.0) ~is 5
+
+// return the largest integer strictly smaller than the input
+fun int_down(x):
+  def ans:
+    cond
+    | base.#{integer?}(x): x - 1
+    | ~else: base.floor(x)
+  base.#{inexact->exact}(ans)
+
+check int_down(3.4) ~is 3
+check int_down(4.0) ~is 3
+
+fun solve_pair([time :: Int, distance :: Int]):
+  def a = -1
+  def b = time
+  def c = -1 * distance
+  def discriminant = base.sqrt(b*b - 4*a*c)
+  // a is negative, so subtracting the discriminant gives the larger solution
+  def hi_bound = (-1 * b - discriminant) / (2 * a)
+  def lo_bound = (-1 * b + discriminant) / (2 * a)
+  max(0,int_down(hi_bound)-int_up(lo_bound)+1)
+
+check solve_pair([7,9]) ~is 4
+
+block:
+  def lines = string_to_lines(sample_string)
+  def pairs = parse_lines(lines)
+
+  def nums_of_solutions = pairs.map(solve_pair)
+  libs.foldl(nums_of_solutions,fun (a,b):a*b,1)
+
+block:
+  def lines = string_to_lines(sample_string)
+  def pairs = parse_lines_2(lines)
+
+  check pairs ~is [[71530,940200]]
+
+  def nums_of_solutions = pairs.map(solve_pair)
+  libs.foldl(nums_of_solutions,fun (a,b):a*b,1)
+
+
+block:
+  def lines = string_to_lines(aoc_api.retrieve_input_for_day(6))
+  def pairs = parse_lines(lines)
+
+  def nums_of_solutions = pairs.map(solve_pair)
+  libs.foldl(nums_of_solutions,fun (a,b):a*b,1)
+
+block:
+  def lines = string_to_lines(aoc_api.retrieve_input_for_day(6))
+  def pairs = parse_lines_2(lines)
+
+  def nums_of_solutions = pairs.map(solve_pair)
+  libs.foldl(nums_of_solutions,fun (a,b):a*b,1)
+
